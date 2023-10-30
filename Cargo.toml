@@ -12,3 +12,4 @@ name = "kvrs"
 path = "src/kvrs.rs"
 
 [dependencies]
+clap = { version = "4.4.7", features = ["derive"] }
