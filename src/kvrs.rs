@@ -3,28 +3,21 @@ use clap::{Arg, Command};
 fn cli() -> Command {
     Command::new("kvrs")
         .name("kvrs")
-        .subcommand(
-            Command::new("get")
-                .arg(Arg::new("key").index(1))
-                .arg_required_else_help(true),
-        )
+        .subcommand(Command::new("get").arg(Arg::new("key").index(1).required(true)))
         .subcommand(
             Command::new("set")
-                .arg(Arg::new("key").index(1))
-                .arg(Arg::new("value").index(2))
-                .arg_required_else_help(true),
+                .arg(Arg::new("key").index(1).required(true))
+                .arg(Arg::new("value").index(2).required(true)),
         )
         .subcommand(
             Command::new("update")
-                .arg(Arg::new("key").index(1))
-                .arg(Arg::new("value").index(2))
-                .arg_required_else_help(true),
+                .arg(Arg::new("key").index(1).required(true))
+                .arg(Arg::new("value").index(2).required(true)),
         )
         .subcommand(
             Command::new("rm")
-                .arg(Arg::new("key").index(1))
-                .arg(Arg::new("value").index(2))
-                .arg_required_else_help(true),
+                .arg(Arg::new("key").index(1).required(true))
+                .arg(Arg::new("value").index(2).required(true)),
         )
         .arg(Arg::new("file").long("file").short('f'))
 }
