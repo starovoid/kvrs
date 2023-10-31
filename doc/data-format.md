@@ -1,16 +1,16 @@
 # Data format
 The data file contains binary values and by default has the **.kv** extension.
 
-| Section            | Type   | Size (in bytes) |
-| -------            | ------ | --------------- |
-| identifier         | `u64`  | 8               |
-| version            | `u8`   | 1               |
-| index position     | `u64`  | 8               |
-| vacant blocks list | `u64`  | 8               |
-| record 1           | `[u8]` | arbitary        |
-| ...                | ...    | ...             |
-| record n           | `[u8]` | arbitary        |
-| vacant blocks list | `[u8]` | arbitary        |
+| Section                     | Type   | Size (in bytes) |
+| --------------------------- | ------ | --------------- |
+| identifier                  | `u64`  | 8               |
+| version                     | `u8`   | 1               |
+| index position              | `u64`  | 8               |
+| vacant blocks list position | `u64`  | 8               |
+| record 1                    | `[u8]` | arbitary        |
+| ...                         | ...    | ...             |
+| record n                    | `[u8]` | arbitary        |
+| vacant blocks list          | `[u8]` | arbitary        |
 
 ---
 
@@ -26,7 +26,7 @@ The data file contains binary values and by default has the **.kv** extension.
 
     The byte number from which begins record containing the index.
 
-- **Vacant blocks list**
+- **Vacant blocks list position**
 
     The byte number from which the list of vacant blocks begins.
 
@@ -39,4 +39,11 @@ The data file contains binary values and by default has the **.kv** extension.
 
 
 ## Vacant blocks list format
-Just a sequence of `u64`` where each number is the position of one vacant block.
+Sorted `Vec<VacantBlock>` serialized in [postcard](https://crates.io/crates/postcard) format.
+
+```rust
+struct VacantBlock {
+    pos: u64,   // It's position in data file
+    size: u64,  // Size in bytes
+}
+```
