@@ -25,39 +25,44 @@ fn cli() -> Command {
 fn main() {
     let matches = cli().get_matches();
 
-    if let Some((operation, args)) = matches.subcommand() {
-        match operation {
-            "get" => {
-                let key = args
-                    .get_one::<String>("key")
-                    .expect("Needs to specify a key: 'kvrs get \"key\"'");
-                println!("Getting a value by the key \"{key}\"")
-            }
-            "set" => {
-                let key = args
-                    .get_one::<String>("key")
-                    .expect("Needs to specify a key: 'kvrs set \"key\" \"value\"'");
-                let _value = args
-                    .get_one::<String>("value")
-                    .expect("Needs to specify a value: 'kvrs set \"key\" \"value\"'");
-                println!("Setting the key-value pair with the key \"{key}\"");
-            }
-            "update" => {
-                let key = args
-                    .get_one::<String>("key")
-                    .expect("Needs to specify a key: 'kvrs update \"key\" \"value\"'");
-                let _new_value = args
-                    .get_one::<String>("value")
-                    .expect("Needs to specify a value: 'kvrs update \"key\" \"value\"'");
-                println!("Updating value by the key \"{key}\"");
-            }
-            "rm" => {
-                let key = args
-                    .get_one::<String>("key")
-                    .expect("Needs to specify a key: 'kvrs rm \"key\"'");
-                println!("Deleting a key-value pair by key \"{key}\"");
-            }
-            _ => unreachable!(),
+    let command = matches.subcommand();
+    if command.is_none() {
+        println!("Command is not set");
+        return;
+    }
+
+    let (operation, args) = command.unwrap();
+    match operation {
+        "get" => {
+            let key = args
+                .get_one::<String>("key")
+                .expect("Needs to specify a key: 'kvrs get \"key\"'");
+            todo!()
         }
+        "set" => {
+            let key = args
+                .get_one::<String>("key")
+                .expect("Needs to specify a key: 'kvrs set \"key\" \"value\"'");
+            let value = args
+                .get_one::<String>("value")
+                .expect("Needs to specify a value: 'kvrs set \"key\" \"value\"'");
+            todo!()
+        }
+        "update" => {
+            let key = args
+                .get_one::<String>("key")
+                .expect("Needs to specify a key: 'kvrs update \"key\" \"value\"'");
+            let _new_value = args
+                .get_one::<String>("value")
+                .expect("Needs to specify a value: 'kvrs update \"key\" \"value\"'");
+            todo!()
+        }
+        "rm" => {
+            let key = args
+                .get_one::<String>("key")
+                .expect("Needs to specify a key: 'kvrs rm \"key\"'");
+            todo!()
+        }
+        _ => unreachable!()
     }
 }
