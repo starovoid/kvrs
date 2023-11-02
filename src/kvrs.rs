@@ -26,12 +26,14 @@ fn main() {
     let matches = cli().get_matches();
 
     let command = matches.subcommand();
-    if command.is_none() {
-        println!("Command is not set");
-        return;
-    }
+    let (operation, args) = match command {
+        Some(cmd) => cmd,
+        None => {
+            println!("Command not set");
+            return;
+        }
+    };
 
-    let (operation, args) = command.unwrap();
     match operation {
         "get" => {
             let key = args
