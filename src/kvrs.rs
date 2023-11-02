@@ -2,7 +2,7 @@ mod handlers;
 
 use crate::handlers::HANDLERS;
 use clap::{Arg, ArgMatches, Command};
-use libkvrs::StorageError;
+use libkvrs::{DataFormatError, StorageError};
 
 fn cli() -> Command {
     Command::new("kvrs")
@@ -48,11 +48,21 @@ fn main() {
     };
 }
 
-fn process_command(operation: &str, args: &ArgMatches) -> Result<(), StorageError> {
+fn process_command(operation: &str, args: &ArgMatches) -> Result<(), String> {
     let handler = match HANDLERS.get(operation) {
         Some(handler) => handler,
-        None => return Err(StorageError::UnknownOperation(operation.to_string())),
+        None => return Err(format!("Unknown '{operation}' operation")),
     };
 
-    handler(args.clone())
+    handler(args.clone()).map_err(|e| format_error_message(&e))
+}
+
+fn format_error_message(err: &StorageError) -> String {
+    match err {
+        StorageError::IO(e) => format!("IO Error: {e}"),
+        StorageError::DataFormat(format_err) => match format_err {
+            DataFormatError::MissedIdentifier => format!("Missing identifier"),
+            DataFormatError::IncorrectVersion(v) => format!("Used unsupported version: {v}"),
+        },
+    }
 }

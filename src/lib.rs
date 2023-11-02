@@ -22,9 +22,6 @@ pub enum StorageError {
 
     /// Wrong data format.
     DataFormat(DataFormatError),
-
-    /// Unknown operation.
-    UnknownOperation(String),
 }
 
 impl fmt::Display for StorageError {
@@ -32,7 +29,6 @@ impl fmt::Display for StorageError {
         match self {
             Self::IO(e) => write!(f, "{e}"),
             Self::DataFormat(e) => write!(f, "Data format error: {e}"),
-            Self::UnknownOperation(command) => write!(f, "Operation '{command}' not found"),
         }
     }
 }
