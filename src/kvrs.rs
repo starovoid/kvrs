@@ -1,8 +1,8 @@
 mod handlers;
 
+use crate::handlers::HANDLERS;
 use clap::{Arg, ArgMatches, Command};
 use libkvrs::StorageError;
-use crate::handlers::HANDLERS;
 
 fn cli() -> Command {
     Command::new("kvrs")
