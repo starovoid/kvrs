@@ -64,5 +64,6 @@ fn format_error_message(err: &StorageError) -> String {
             DataFormatError::MissedIdentifier => format!("Missing identifier"),
             DataFormatError::IncorrectVersion(v) => format!("Used unsupported version: {v}"),
         },
+        StorageError::FailedLoadIndex => format!("Failed to load index"),
     }
 }

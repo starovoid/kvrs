@@ -3,8 +3,10 @@ use indexmap::IndexMap;
 
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Cursor, Read};
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
+
+type Index = IndexMap<Vec<u8>, u64>;
 
 /// The first 8 bytes of the file indicating working with the correct format.
 /// This number represents the following set of bytes: `c4 b7 d1 b5 c5 97 c5 a1`.
@@ -22,6 +24,9 @@ pub enum StorageError {
 
     /// Wrong data format.
     DataFormat(DataFormatError),
+
+    /// Failed to load index.
+    FailedLoadIndex,
 }
 
 impl fmt::Display for StorageError {
@@ -29,6 +34,7 @@ impl fmt::Display for StorageError {
         match self {
             Self::IO(e) => write!(f, "{e}"),
             Self::DataFormat(e) => write!(f, "Data format error: {e}"),
+            Self::FailedLoadIndex => write!(f, "Failed to load index"),
         }
     }
 }
@@ -82,7 +88,7 @@ impl Storage<Cursor<Vec<u8>>> {
     }
 }
 
-impl<T: Read> Storage<T> {
+impl<T: Read + Seek> Storage<T> {
     fn check_prefix(data: &mut T) -> Result<(), StorageError> {
         let ind = data
             .read_u64::<BigEndian>()
@@ -102,15 +108,35 @@ impl<T: Read> Storage<T> {
         Ok(())
     }
 
-    fn load_index(_data: &mut T) -> Result<IndexMap<Vec<u8>, u64>, StorageError> {
-        // STUB
-        Ok(IndexMap::new())
+    /// Load index from the data stream.
+    fn load_index(data: &mut T) -> Result<Index, StorageError> {
+        data.seek(SeekFrom::Start(9))
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        let index_pos = data
+            .read_u64::<BigEndian>()
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        data.seek(SeekFrom::Start(index_pos))
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        let index_len = data
+            .read_u64::<BigEndian>()
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        let mut buf: Vec<u8> = vec![0; index_len as usize];
+        data.read_exact(&mut buf)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        let index = postcard::from_bytes(&buf).map_err(|_| StorageError::FailedLoadIndex)?;
+        Ok(index)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
 
     #[test]
     fn test_check_prefix() {
@@ -162,5 +188,53 @@ mod tests {
             Storage::check_prefix(&mut Cursor::new(wrong_ident_and_version)),
             Err(StorageError::DataFormat(DataFormatError::MissedIdentifier))
         );
+    }
+
+    #[test]
+    fn test_load_index() {
+        // Just random bytes
+        let tail_data: Vec<u8> = vec![
+            73, 80, 42, 255, 0, 0, 123, 84, 19, 1, 2, 64, 90, 17, 48, 55, 33,
+        ];
+
+        let do_test = |index: Index| {
+            let ser_ind = postcard::to_allocvec(&index).unwrap();
+
+            let mut data: Vec<u8> = vec![0xc4, 0xb7, 0xd1, 0xb5, 0xc5, 0x97, 0xc5, 0xa1, 1];
+            data.extend(&[0, 0, 0, 0, 0, 0, 0, 17]); // Index position
+            data.extend((ser_ind.len() as u64).to_be_bytes());
+            data.append(&mut ser_ind.clone());
+
+            assert_eq!(
+                Storage::load_index(&mut Cursor::new(data.clone())),
+                Ok(index.clone()),
+            );
+
+            data.extend(&tail_data);
+            assert_eq!(Storage::load_index(&mut Cursor::new(data)), Ok(index),);
+        };
+
+        // Empty index
+        do_test(Index::new());
+        // Index length = 1
+        do_test(Index::from([(vec![1, 2, 3], 123)]));
+        // Index length = 2
+        do_test(Index::from([(vec![1, 2, 3], 123), (vec![10], 20)]));
+
+        // Random tests
+        let mut rng = rand::thread_rng();
+        for _ in 0..50 {
+            let len = rng.gen_range(1..200usize);
+
+            let mut ind = Index::with_capacity(len);
+            for _ in 0..len {
+                let key_len = rng.gen_range(1..300);
+                let key = (0..key_len).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+                let value_pos = rng.gen::<u64>();
+                ind.insert(key, value_pos);
+            }
+
+            do_test(ind);
+        }
     }
 }
