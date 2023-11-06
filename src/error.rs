@@ -11,6 +11,9 @@ pub enum StorageError {
 
     /// Failed to load index.
     FailedLoadIndex,
+
+    /// Failed to serialize something.
+    SerializationError
 }
 
 impl fmt::Display for StorageError {
@@ -19,6 +22,7 @@ impl fmt::Display for StorageError {
             Self::IO(e) => write!(f, "{e}"),
             Self::DataFormat(e) => write!(f, "Data format error: {e}"),
             Self::FailedLoadIndex => write!(f, "Failed to load index"),
+            Self::SerializationError => write!(f, "Failed to serialize something")
         }
     }
 }
@@ -35,9 +39,14 @@ pub enum DataFormatError {
 
 impl fmt::Display for DataFormatError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use crate::OLDEST_VERSION;
+
         match self {
             Self::MissedIdentifier => write!(f, "Missing identifier at the beginning of the data file."),
-            Self::IncorrectVersion(n) => write!(f, "Incorrect version number of the data file format: {n}. The older version has the number {OLDEST_VERSION}"),
+            Self::IncorrectVersion(n) => write!(
+                f, "Incorrect version number of the data file format: {}. The older version has the number {}",
+                n, OLDEST_VERSION
+            ),
         }
     }
 }
