@@ -1,6 +1,6 @@
 use clap::ArgMatches;
 use lazy_static::lazy_static;
-use libkvrs::StorageError;
+use libkvrs::error::StorageError;
 use std::collections::HashMap;
 
 type HandlerType = fn(ArgMatches) -> Result<(), StorageError>;

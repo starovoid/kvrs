@@ -2,7 +2,7 @@ mod handlers;
 
 use crate::handlers::HANDLERS;
 use clap::{Arg, ArgMatches, Command};
-use libkvrs::{DataFormatError, StorageError};
+use libkvrs::error::{DataFormatError, StorageError};
 
 fn cli() -> Command {
     Command::new("kvrs")
@@ -65,5 +65,6 @@ fn format_error_message(err: &StorageError) -> String {
             DataFormatError::IncorrectVersion(v) => format!("Used unsupported version: {v}"),
         },
         StorageError::FailedLoadIndex => format!("Failed to load index"),
+        StorageError::SerializationError => format!("Failed to serialize something"),
     }
 }

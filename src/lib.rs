@@ -1,10 +1,13 @@
+pub mod error;
+
+use crate::error::{DataFormatError, StorageError};
 use byteorder::{BigEndian, ReadBytesExt};
 use indexmap::IndexMap;
-
-use std::fmt;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
-use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
+use std::{mem, vec};
 
 type Index = IndexMap<Vec<u8>, u64>;
 
@@ -16,52 +19,11 @@ const IDENTIFIER: u64 = 14175028930806269345;
 /// The oldest version of the data file format.
 const OLDEST_VERSION: u8 = 1;
 
-/// Top-level type of library error.
-#[derive(Debug, PartialEq)]
-pub enum StorageError {
-    /// I/O error with kinds from `std::io`.`
-    IO(io::ErrorKind),
-
-    /// Wrong data format.
-    DataFormat(DataFormatError),
-
-    /// Failed to load index.
-    FailedLoadIndex,
-}
-
-impl fmt::Display for StorageError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IO(e) => write!(f, "{e}"),
-            Self::DataFormat(e) => write!(f, "Data format error: {e}"),
-            Self::FailedLoadIndex => write!(f, "Failed to load index"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-// Possible data format errors.
-pub enum DataFormatError {
-    /// Missing identifier of the bytes `c4 b7 d1 b5 c5 97 c5 a1` (the first 8 bytes of data).
-    MissedIdentifier,
-
-    /// Incorrect version number is specified (byte with index 8 from the beginning of the data).
-    IncorrectVersion(u8),
-}
-
-impl fmt::Display for DataFormatError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissedIdentifier => write!(f, "Missing identifier at the beginning of the data file."),
-            Self::IncorrectVersion(n) => write!(f, "Incorrect version number of the data file format: {n}. The older version has the number {OLDEST_VERSION}"),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Storage<T> {
     inner: T,
     index: IndexMap<Vec<u8>, u64>,
+    vacant_blocks: Vec<VacantBlock>,
 }
 
 impl Storage<File> {
@@ -75,7 +37,11 @@ impl Storage<File> {
 
         Storage::check_prefix(&mut file)?;
         let index = Storage::load_index(&mut file)?;
-        Ok(Self { inner: file, index })
+        Ok(Self {
+            inner: file,
+            index,
+            vacant_blocks: vec![],
+        })
     }
 }
 
@@ -84,7 +50,11 @@ impl Storage<Cursor<Vec<u8>>> {
         let mut data = Cursor::new(buf);
         Storage::check_prefix(&mut data)?;
         let index = Storage::load_index(&mut data)?;
-        Ok(Self { inner: data, index })
+        Ok(Self {
+            inner: data,
+            index,
+            vacant_blocks: vec![],
+        })
     }
 }
 
@@ -130,6 +100,41 @@ impl<T: Read + Seek> Storage<T> {
 
         let index = postcard::from_bytes(&buf).map_err(|_| StorageError::FailedLoadIndex)?;
         Ok(index)
+    }
+
+    fn serialize(&self) -> Result<Vec<u8>, StorageError> {
+        let identifier =
+            postcard::to_allocvec(&IDENTIFIER).map_err(|_| StorageError::SerializationError)?;
+        // todo: Change to current version?
+        let version =
+            postcard::to_allocvec(&OLDEST_VERSION).map_err(|_| StorageError::SerializationError)?;
+        let index_position =
+            postcard::to_allocvec(&self.index).map_err(|_| StorageError::SerializationError)?;
+
+        let vacant_blocks_size = mem::size_of::<VacantBlock>() * self.vacant_blocks.len();
+        let mut vacant_blocks = Vec::with_capacity(vacant_blocks_size);
+        for vacant_block in self.vacant_blocks.iter() {
+            vacant_blocks.extend(vacant_block.serialize()?);
+        }
+
+        let bytes = [identifier, version, index_position, vacant_blocks].concat();
+        Ok(bytes)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct VacantBlock {
+    pos: u64,
+    size: u64,
+}
+
+impl VacantBlock {
+    pub fn new(pos: u64, size: u64) -> Self {
+        Self { pos, size }
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>, StorageError> {
+        postcard::to_allocvec(self).map_err(|_| StorageError::SerializationError)
     }
 }
 
