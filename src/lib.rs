@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use indexmap::IndexMap;
 
+use serde::{Deserialize, Serialize};
+
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
@@ -173,29 +175,64 @@ impl<T: Read + Seek> Storage<T> {
 impl<T: Write + Seek> Storage<T> {
     /// Storage (database) initialization.
     fn initialize(&mut self) -> Result<(), StorageError> {
+        let ser_index =
+            postcard::to_allocvec(&self.index).map_err(|_| StorageError::FailedSaveIndex)?;
+
+        let ser_vb_list = postcard::to_allocvec(&Vec::<VacantBlock>::new())
+            .map_err(|_| StorageError::FailedSaveIndex)?;
+
+        // Identifier
         self.inner
             .write_u64::<BigEndian>(IDENTIFIER)
             .map_err(|e| StorageError::IO(e.kind()))?;
+
+        // Version
         self.inner
             .write(&[self.version])
             .map_err(|e| StorageError::IO(e.kind()))?;
+
+        // Index position
         self.inner
-            .write_u64::<BigEndian>(9)
+            .write_u64::<BigEndian>(25)
             .map_err(|e| StorageError::IO(e.kind()))?;
 
-        let ser_index =
-            postcard::to_allocvec(&self.index).map_err(|_| StorageError::FailedSaveIndex)?;
+        // Vacant blocks list position
+        self.inner
+            .write_u64::<BigEndian>(33 + ser_index.len() as u64)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
+        // Index size
         self.inner
             .write_u64::<BigEndian>(ser_index.len() as u64)
             .map_err(|e| StorageError::IO(e.kind()))?;
+        // Index
         self.inner
             .write_all(&ser_index)
             .map_err(|e| StorageError::IO(e.kind()))?;
 
-        // TODO:  self.save_vacant_blocks_list();
+        // Vacant blocks list size
+        self.inner
+            .write_u64::<BigEndian>(ser_vb_list.len() as u64)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+        // Vacant blocks list
+        self.inner
+            .write_all(&ser_vb_list)
+            .map_err(|e| StorageError::IO(e.kind()))?;
 
         self.inner.flush().map_err(|e| StorageError::IO(e.kind()))?;
         Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct VacantBlock {
+    pos: u64,
+    size: u64,
+}
+
+impl VacantBlock {
+    pub fn new(pos: u64, size: u64) -> Self {
+        Self { pos, size }
     }
 }
 
@@ -306,7 +343,20 @@ mod tests {
 
     #[test]
     fn test_initialize() {
-        let st = Storage::new_vectored().unwrap();
-        assert_eq!(Storage::from_vec(st.inner.get_ref().clone()), Ok(st));
+        let mut st = Storage::new_vectored().unwrap();
+
+        assert_eq!(
+            st.inner.get_ref(),
+            &[
+                196, 183, 209, 181, 197, 151, 197, 161, 1, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0,
+                0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
+            ]
+        );
+
+        let mut left = Storage::from_vec(st.inner.get_ref().clone()).unwrap();
+        left.inner.seek(SeekFrom::Start(0)).unwrap();
+        st.inner.seek(SeekFrom::Start(0)).unwrap();
+
+        assert_eq!(left, st);
     }
 }
