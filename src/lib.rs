@@ -77,6 +77,16 @@ impl Storage<File> {
         let index = Storage::load_index(&mut file)?;
         Ok(Self { inner: file, index })
     }
+
+    /// Creating a new data file.
+    pub fn new_file(path: impl AsRef<Path>) -> Result<Self, StorageError> {
+        let file = File::create(path).map_err(|e| StorageError::IO(e.kind()))?;
+        let mut st = Storage {
+            inner: file,
+            index: IndexMap::new(),
+        };
+        Ok(st)
+    }
 }
 
 impl Storage<Cursor<Vec<u8>>> {
