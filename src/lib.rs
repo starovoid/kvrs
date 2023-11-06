@@ -62,7 +62,7 @@ impl fmt::Display for DataFormatError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Storage<T> {
     inner: T,
     index: IndexMap<Vec<u8>, u64>,
@@ -110,6 +110,16 @@ impl Storage<Cursor<Vec<u8>>> {
             index,
             version,
         })
+    }
+
+    pub fn new_vectored() -> Result<Self, StorageError> {
+        let mut st = Storage {
+            inner: Cursor::new(Vec::new()),
+            index: IndexMap::new(),
+            version: OLDEST_VERSION,
+        };
+        st.initialize()?;
+        Ok(st)
     }
 }
 
@@ -172,8 +182,18 @@ impl<T: Write + Seek> Storage<T> {
         self.inner
             .write_u64::<BigEndian>(9)
             .map_err(|e| StorageError::IO(e.kind()))?;
-        // TODO:  self.save_index();
+
+        let ser_index =
+            postcard::to_allocvec(&self.index).map_err(|_| StorageError::FailedSaveIndex)?;
+        self.inner
+            .write_u64::<BigEndian>(ser_index.len() as u64)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+        self.inner
+            .write_all(&ser_index)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+
         // TODO:  self.save_vacant_blocks_list();
+
         self.inner.flush().map_err(|e| StorageError::IO(e.kind()))?;
         Ok(())
     }
@@ -282,5 +302,11 @@ mod tests {
 
             do_test(ind);
         }
+    }
+
+    #[test]
+    fn test_initialize() {
+        let st = Storage::new_vectored().unwrap();
+        assert_eq!(Storage::from_vec(st.inner.get_ref().clone()), Ok(st));
     }
 }
