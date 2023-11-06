@@ -98,7 +98,7 @@ impl Storage<Cursor<Vec<u8>>> {
     }
 }
 
-impl<T: Read + Seek> Storage<T> {
+impl<T: Read> Storage<T> {
     fn check_prefix(data: &mut T) -> Result<(), StorageError> {
         let ind = data
             .read_u64::<BigEndian>()
@@ -117,7 +117,9 @@ impl<T: Read + Seek> Storage<T> {
 
         Ok(())
     }
+}
 
+impl<T: Read + Seek> Storage<T> {
     /// Load index from the data stream.
     fn load_index(data: &mut T) -> Result<Index, StorageError> {
         data.seek(SeekFrom::Start(9))
