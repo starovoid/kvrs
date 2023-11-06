@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 type Index = IndexMap<Vec<u8>, u64>;
@@ -27,6 +27,9 @@ pub enum StorageError {
 
     /// Failed to load index.
     FailedLoadIndex,
+
+    /// Faild to save index.
+    FailedSaveIndex,
 }
 
 impl fmt::Display for StorageError {
@@ -35,6 +38,7 @@ impl fmt::Display for StorageError {
             Self::IO(e) => write!(f, "{e}"),
             Self::DataFormat(e) => write!(f, "Data format error: {e}"),
             Self::FailedLoadIndex => write!(f, "Failed to load index"),
+            Self::FailedSaveIndex => write!(f, "Failed to save index"),
         }
     }
 }
@@ -157,7 +161,7 @@ impl<T: Read + Seek> Storage<T> {
 }
 
 impl<T: Write + Seek> Storage<T> {
-    // Storage (database) initialization.
+    /// Storage (database) initialization.
     fn initialize(&mut self) -> Result<(), StorageError> {
         self.inner
             .write_u64::<BigEndian>(IDENTIFIER)
