@@ -74,12 +74,12 @@ impl Storage<File> {
             .open(path)
             .map_err(|e| StorageError::IO(e.kind()))?;
 
-        Storage::check_prefix(&mut file)?;
+        let version = Storage::check_prefix(&mut file)?;
         let index = Storage::load_index(&mut file)?;
         Ok(Self {
             inner: file,
             index,
-            version: 0,
+            version,
         })
     }
 
@@ -99,18 +99,18 @@ impl Storage<File> {
 impl Storage<Cursor<Vec<u8>>> {
     pub fn from_vec(buf: Vec<u8>) -> Result<Self, StorageError> {
         let mut data = Cursor::new(buf);
-        Storage::check_prefix(&mut data)?;
+        let version = Storage::check_prefix(&mut data)?;
         let index = Storage::load_index(&mut data)?;
         Ok(Self {
             inner: data,
             index,
-            version: 0,
+            version,
         })
     }
 }
 
 impl<T: Read> Storage<T> {
-    fn check_prefix(data: &mut T) -> Result<(), StorageError> {
+    fn check_prefix(data: &mut T) -> Result<u8, StorageError> {
         let ind = data
             .read_u64::<BigEndian>()
             .map_err(|e| StorageError::IO(e.kind()))?;
@@ -126,7 +126,7 @@ impl<T: Read> Storage<T> {
             )));
         }
 
-        Ok(())
+        Ok(version)
     }
 }
 
@@ -188,10 +188,10 @@ mod tests {
         let mut correct: Vec<u8> = vec![0xc4, 0xb7, 0xd1, 0xb5, 0xc5, 0x97, 0xc5, 0xa1, 1];
         assert_eq!(
             Storage::check_prefix(&mut Cursor::new(correct.clone())),
-            Ok(())
+            Ok(1)
         );
         correct.append(&mut tail_data.clone());
-        assert_eq!(Storage::check_prefix(&mut Cursor::new(correct)), Ok(()));
+        assert_eq!(Storage::check_prefix(&mut Cursor::new(correct)), Ok(1));
 
         let mut wrong_version: Vec<u8> = vec![0xc4, 0xb7, 0xd1, 0xb5, 0xc5, 0x97, 0xc5, 0xa1, 123];
         assert_eq!(
