@@ -1,9 +1,9 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use indexmap::IndexMap;
 
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::io::{self, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 type Index = IndexMap<Vec<u8>, u64>;
@@ -62,6 +62,7 @@ impl fmt::Display for DataFormatError {
 pub struct Storage<T> {
     inner: T,
     index: IndexMap<Vec<u8>, u64>,
+    version: u8,
 }
 
 impl Storage<File> {
@@ -75,7 +76,11 @@ impl Storage<File> {
 
         Storage::check_prefix(&mut file)?;
         let index = Storage::load_index(&mut file)?;
-        Ok(Self { inner: file, index })
+        Ok(Self {
+            inner: file,
+            index,
+            version: 0,
+        })
     }
 
     /// Creating a new data file.
@@ -84,7 +89,9 @@ impl Storage<File> {
         let mut st = Storage {
             inner: file,
             index: IndexMap::new(),
+            version: OLDEST_VERSION,
         };
+        st.initialize()?;
         Ok(st)
     }
 }
@@ -94,7 +101,11 @@ impl Storage<Cursor<Vec<u8>>> {
         let mut data = Cursor::new(buf);
         Storage::check_prefix(&mut data)?;
         let index = Storage::load_index(&mut data)?;
-        Ok(Self { inner: data, index })
+        Ok(Self {
+            inner: data,
+            index,
+            version: 0,
+        })
     }
 }
 
@@ -142,6 +153,25 @@ impl<T: Read + Seek> Storage<T> {
 
         let index = postcard::from_bytes(&buf).map_err(|_| StorageError::FailedLoadIndex)?;
         Ok(index)
+    }
+}
+
+impl<T: Write + Seek> Storage<T> {
+    // Storage (database) initialization.
+    fn initialize(&mut self) -> Result<(), StorageError> {
+        self.inner
+            .write_u64::<BigEndian>(IDENTIFIER)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+        self.inner
+            .write(&[self.version])
+            .map_err(|e| StorageError::IO(e.kind()))?;
+        self.inner
+            .write_u64::<BigEndian>(9)
+            .map_err(|e| StorageError::IO(e.kind()))?;
+        // TODO:  self.save_index();
+        // TODO:  self.save_vacant_blocks_list();
+        self.inner.flush().map_err(|e| StorageError::IO(e.kind()))?;
+        Ok(())
     }
 }
 
