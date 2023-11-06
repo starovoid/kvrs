@@ -65,6 +65,6 @@ fn format_error_message(err: &StorageError) -> String {
             DataFormatError::IncorrectVersion(v) => format!("Used unsupported version: {v}"),
         },
         StorageError::FailedLoadIndex => format!("Failed to load index"),
-        StorageError::SerializationError => format!("Failed to serialize something")
+        StorageError::SerializationError => format!("Failed to serialize something"),
     }
 }

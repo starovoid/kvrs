@@ -1,13 +1,13 @@
 pub mod error;
 
+use crate::error::{DataFormatError, StorageError};
 use byteorder::{BigEndian, ReadBytesExt};
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
 use std::{mem, vec};
-use serde::{Deserialize, Serialize};
-use crate::error::{DataFormatError, StorageError};
 
 type Index = IndexMap<Vec<u8>, u64>;
 
@@ -23,7 +23,7 @@ const OLDEST_VERSION: u8 = 1;
 pub struct Storage<T> {
     inner: T,
     index: IndexMap<Vec<u8>, u64>,
-    vacant_blocks: Vec<VacantBlock>
+    vacant_blocks: Vec<VacantBlock>,
 }
 
 impl Storage<File> {
@@ -37,7 +37,11 @@ impl Storage<File> {
 
         Storage::check_prefix(&mut file)?;
         let index = Storage::load_index(&mut file)?;
-        Ok(Self { inner: file, index, vacant_blocks: vec![] })
+        Ok(Self {
+            inner: file,
+            index,
+            vacant_blocks: vec![],
+        })
     }
 }
 
@@ -46,7 +50,11 @@ impl Storage<Cursor<Vec<u8>>> {
         let mut data = Cursor::new(buf);
         Storage::check_prefix(&mut data)?;
         let index = Storage::load_index(&mut data)?;
-        Ok(Self { inner: data, index, vacant_blocks: vec![] })
+        Ok(Self {
+            inner: data,
+            index,
+            vacant_blocks: vec![],
+        })
     }
 }
 
@@ -95,14 +103,13 @@ impl<T: Read + Seek> Storage<T> {
     }
 
     fn serialize(&self) -> Result<Vec<u8>, StorageError> {
-
-        let identifier = postcard::to_allocvec(&IDENTIFIER)
-            .map_err(|_| StorageError::SerializationError)?;
+        let identifier =
+            postcard::to_allocvec(&IDENTIFIER).map_err(|_| StorageError::SerializationError)?;
         // todo: Change to current version?
-        let version = postcard::to_allocvec(&OLDEST_VERSION)
-            .map_err(|_| StorageError::SerializationError)?;
-        let index_position = postcard::to_allocvec(&self.index)
-            .map_err(|_| StorageError::SerializationError)?;
+        let version =
+            postcard::to_allocvec(&OLDEST_VERSION).map_err(|_| StorageError::SerializationError)?;
+        let index_position =
+            postcard::to_allocvec(&self.index).map_err(|_| StorageError::SerializationError)?;
 
         let vacant_blocks_size = mem::size_of::<VacantBlock>() * self.vacant_blocks.len();
         let mut vacant_blocks = Vec::with_capacity(vacant_blocks_size);
@@ -118,7 +125,7 @@ impl<T: Read + Seek> Storage<T> {
 #[derive(Serialize, Deserialize, Debug)]
 struct VacantBlock {
     pos: u64,
-    size: u64
+    size: u64,
 }
 
 impl VacantBlock {

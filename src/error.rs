@@ -13,7 +13,7 @@ pub enum StorageError {
     FailedLoadIndex,
 
     /// Failed to serialize something.
-    SerializationError
+    SerializationError,
 }
 
 impl fmt::Display for StorageError {
@@ -22,7 +22,7 @@ impl fmt::Display for StorageError {
             Self::IO(e) => write!(f, "{e}"),
             Self::DataFormat(e) => write!(f, "Data format error: {e}"),
             Self::FailedLoadIndex => write!(f, "Failed to load index"),
-            Self::SerializationError => write!(f, "Failed to serialize something")
+            Self::SerializationError => write!(f, "Failed to serialize something"),
         }
     }
 }
